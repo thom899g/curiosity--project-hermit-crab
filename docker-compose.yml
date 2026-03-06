@@ -1,0 +1,47 @@
+version: '3.8'
+services:
+  hermit-crab:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./models:/app/models
+      - ./logs:/app/logs
+    environment:
+      - MODEL_PATH=/app/models/phi-2.Q4_K_M.gguf
+      - N_THREADS=2
+      - N_CTX=2048
+      - MAX_TOKENS=512
+      - TEMPERATURE=0.7
+      - LOG_LEVEL=INFO
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8080/health', timeout=2)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+
+  # Optional monitoring stack for production
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    volumes:
+      - ./grafana-dashboard.json:/etc/grafana/provisioning/dashboards/hermit-crab.json
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=hermitcrab
